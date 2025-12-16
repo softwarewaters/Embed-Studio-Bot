@@ -435,85 +435,88 @@ client.commands.set(accountRecoveryCommand.data.name, accountRecoveryCommand);
 
 // --- Interaction Handlers ---
 client.on('interactionCreate', async interaction => {
-    if (interaction.isButton()) {
-        if (interaction.customId === 'recovery_continue') {
-            const tosEmbed = new EmbedBuilder()
-                .setTitle('Agree To TOS')
-                .setDescription('To continue, you must agree to our guidelines / TOS. This is if your account may have been suspended due to guideline breaks.')
-                .setColor(0xFFFF00);
-            const tosButtons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('recovery_tos_agree')
-                        .setLabel('Agree')
-                        .setStyle(ButtonStyle.Success),
-                    new ButtonBuilder()
-                        .setCustomId('recovery_tos_deny')
-                        .setLabel('Deny')
-                        .setStyle(ButtonStyle.Danger)
-                );
-            await interaction.update({ embeds: [tosEmbed], components: [tosButtons] });
-        } else if (interaction.customId === 'recovery_cancel') {
-            const cancelEmbed = new EmbedBuilder()
-                .setTitle('Account Recovery Canceled')
-                .setDescription('The account recovery process has been canceled.')
-                .setColor(0xFF0000);
-            await interaction.update({ embeds: [cancelEmbed], components: [] });
-        } else if (interaction.customId === 'recovery_tos_agree') {
-            const emailModal = new ModalBuilder()
-                .setCustomId('recovery_email_modal')
-                .setTitle('Enter Your Email');
-            const emailInput = new TextInputBuilder()
-                .setCustomId('recovery_email_input')
-                .setLabel('Your Email Address')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setMaxLength(254);
-            emailModal.addComponents(new ActionRowBuilder().addComponents(emailInput));
-            await interaction.showModal(emailModal);
-        } else if (interaction.customId === 'recovery_tos_deny') {
-            const denyEmbed = new EmbedBuilder()
-                .setTitle('TOS Not Accepted')
-                .setDescription('You must accept the TOS to proceed with account recovery.')
-                .setColor(0xFFA500);
-            await interaction.update({ embeds: [denyEmbed], components: [] });
-        } else if (interaction.customId === 'recovery_email_modal') {
-            const email = interaction.fields.getTextInputValue('recovery_email_input');
-            recoveryStates.set(interaction.user.id, { email });
-            const deviceEmbed = new EmbedBuilder()
-                .setTitle('Device Information')
-                .setDescription('Now, please tell us what device you are trying to access your account on.\nExample: Windows 11 Chrome')
-                .setColor(0x00FF00);
-            const deviceModal = new ModalBuilder()
-                .setCustomId('recovery_device_modal')
-                .setTitle('Enter Device Info');
-            const deviceInput = new TextInputBuilder()
-                .setCustomId('recovery_device_input')
-                .setLabel('Device Info')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setMaxLength(100);
-            deviceModal.addComponents(new ActionRowBuilder().addComponents(deviceInput));
-            await interaction.showModal(deviceModal);
-        }
-    } else if (interaction.isModalSubmit()) {
-        if (interaction.customId === 'recovery_device_modal') {
-            const deviceInfo = interaction.fields.getTextInputValue('recovery_device_input');
-            const userId = interaction.user.id;
-            const state = recoveryStates.get(userId);
-            const email = state ? state.email : 'Unknown';
-            const finalEmbed = new EmbedBuilder()
-                .setTitle('Recovery Request Submitted')
-                .addFields(
-                    { name: 'Email', value: email, inline: false },
-                    { name: 'Device', value: deviceInfo, inline: false }
-                )
-                .setDescription('Please wait for one of our tech supports to get back to you!')
-                .setColor(0x00FF00);
-            await interaction.reply({ embeds: [finalEmbed], ephemeral: false });
-            recoveryStates.delete(userId);
-        }
+  if (interaction.isButton()) {
+    if (interaction.customId === 'recovery_continue') {
+      const tosEmbed = new EmbedBuilder()
+        .setTitle('Agree To TOS')
+        .setDescription('To continue, you must agree to our guidelines / TOS. This is if your account may have been suspended due to guideline breaks.')
+        .setColor(0xFFFF00);
+      const tosButtons = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId('recovery_tos_agree')
+            .setLabel('Agree')
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId('recovery_tos_deny')
+            .setLabel('Deny')
+            .setStyle(ButtonStyle.Danger)
+        );
+      await interaction.update({ embeds: [tosEmbed], components: [tosButtons] });
+    } else if (interaction.customId === 'recovery_cancel') {
+      const cancelEmbed = new EmbedBuilder()
+        .setTitle('Account Recovery Canceled')
+        .setDescription('The account recovery has been canceled.')
+        .setColor(0xFF0000);
+      await interaction.update({ embeds: [cancelEmbed], components: [] });
+    } else if (interaction.customId === 'recovery_tos_agree') {
+      const emailModal = new ModalBuilder()
+        .setCustomId('recovery_email_modal')
+        .setTitle('Enter Your Email');
+      const emailInput = new TextInputBuilder()
+        .setCustomId('recovery_email_input')
+        .setLabel('Your Email Address')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(254);
+      emailModal.addComponents(new ActionRowBuilder().addComponents(emailInput));
+      await interaction.showModal(emailModal);
+    } else if (interaction.customId === 'recovery_tos_deny') {
+      const denyEmbed = new EmbedBuilder()
+        .setTitle('TOS Not Accepted')
+        .setDescription('You must accept the TOS to proceed with account recovery.')
+        .setColor(0xFFA500);
+      await interaction.update({ embeds: [denyEmbed], components: [] });
     }
+  }
+
+  if (interaction.isModalSubmit()) {
+    if (interaction.customId === 'recovery_email_modal') {
+      const email = interaction.fields.getTextInputValue('recovery_email_input');
+      recoveryStates.set(interaction.user.id, { email });
+      const deviceEmbed = new EmbedBuilder()
+        .setTitle('Device Information')
+        .setDescription('Now, please tell us what device you are trying to access your account on.\nExample: Windows 11 Chrome')
+        .setColor(0x00FF00);
+      const deviceModal = new ModalBuilder()
+        .setCustomId('recovery_device_modal')
+        .setTitle('Enter Device Info');
+      const deviceInput = new TextInputBuilder()
+        .setCustomId('recovery_device_input')
+        .setLabel('Device Info')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(100);
+      deviceModal.addComponents(new ActionRowBuilder().addComponents(deviceInput));
+      await interaction.showModal(deviceModal);
+    } else if (interaction.customId === 'recovery_device_modal') {
+      const deviceInfo = interaction.fields.getTextInputValue('recovery_device_input');
+      const userId = interaction.user.id;
+      const state = recoveryStates.get(userId);
+      const email = state ? state.email : 'Unknown';
+
+      const finalEmbed = new EmbedBuilder()
+        .setTitle('Recovery Request Submitted')
+        .addFields(
+          { name: 'Email', value: email, inline: false },
+          { name: 'Device', value: deviceInfo, inline: false }
+        )
+        .setDescription('Please wait for one of our tech supports to get back to you!')
+        .setColor(0x00FF00);
+      await interaction.reply({ embeds: [finalEmbed], ephemeral: false });
+      recoveryStates.delete(userId);
+    }
+  }
 
     // Handle slash commands
     if (interaction.isChatInputCommand()) {
