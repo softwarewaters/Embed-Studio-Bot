@@ -438,53 +438,51 @@ client.on('interactionCreate', async interaction => {
 
   // --- BUTTON HANDLER ---
   if (interaction.isButton()) {
-    if (interaction.customId === 'recovery_continue') {
-      const tosEmbed = new EmbedBuilder()
-        .setTitle('Agree To TOS')
-        .setDescription('To continue, you must agree to our guidelines / TOS. This is if your account may have been suspended due to guideline breaks.')
-        .setColor(0xFFFF00);
+  if (interaction.customId === 'recovery_continue') {
+    const tosEmbed = new EmbedBuilder()
+      .setTitle('Agree To TOS')
+      .setDescription('To continue, you must agree to our guidelines / TOS. This is if your account may have been suspended due to guideline breaks.')
+      .setColor(0xFFFF00);
 
-      const tosButtons = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('recovery_tos_agree').setLabel('Agree').setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId('recovery_tos_deny').setLabel('Deny').setStyle(ButtonStyle.Danger)
-      );
+    const tosButtons = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('recovery_tos_agree').setLabel('Agree').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId('recovery_tos_deny').setLabel('Deny').setStyle(ButtonStyle.Danger)
+    );
 
-      await interaction.update({ embeds: [tosEmbed], components: [tosButtons] });
+    // ✅ Update message with TOS buttons
+    await interaction.update({ embeds: [tosEmbed], components: [tosButtons] });
 
-    } else if (interaction.customId === 'recovery_cancel') {
-      const cancelEmbed = new EmbedBuilder()
-        .setTitle('Account Recovery Canceled')
-        .setDescription('The account recovery has been canceled.')
-        .setColor(0xFF0000);
-      await interaction.update({ embeds: [cancelEmbed], components: [] });
+  } else if (interaction.customId === 'recovery_cancel') {
+    const cancelEmbed = new EmbedBuilder()
+      .setTitle('Account Recovery Canceled')
+      .setDescription('The account recovery has been canceled.')
+      .setColor(0xFF0000);
+    await interaction.update({ embeds: [cancelEmbed], components: [] });
 
-    } else if (interaction.customId === 'recovery_tos_agree') {
-      // ✅ ACKNOWLEDGE BUTTON
-      await interaction.deferUpdate();
+  } else if (interaction.customId === 'recovery_tos_agree') {
+    // Do NOT deferUpdate() here! Just show the modal directly
+    const emailModal = new ModalBuilder()
+      .setCustomId('recovery_email_modal')
+      .setTitle('Enter Your Email');
 
-      // --- EMAIL MODAL ---
-      const emailModal = new ModalBuilder()
-        .setCustomId('recovery_email_modal')
-        .setTitle('Enter Your Email');
+    const emailInput = new TextInputBuilder()
+      .setCustomId('recovery_email_input')
+      .setLabel('Your Email Address')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMaxLength(254);
 
-      const emailInput = new TextInputBuilder()
-        .setCustomId('recovery_email_input')
-        .setLabel('Your Email Address')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true)
-        .setMaxLength(254);
+    emailModal.addComponents(new ActionRowBuilder().addComponents(emailInput));
 
-      emailModal.addComponents(new ActionRowBuilder().addComponents(emailInput));
-      await interaction.showModal(emailModal);
-
-    } else if (interaction.customId === 'recovery_tos_deny') {
-      const denyEmbed = new EmbedBuilder()
-        .setTitle('TOS Not Accepted')
-        .setDescription('You must accept the TOS to proceed with account recovery.')
-        .setColor(0xFFA500);
-      await interaction.update({ embeds: [denyEmbed], components: [] });
-    }
+    await interaction.showModal(emailModal); // works now without InteractionAlreadyReplied
+  } else if (interaction.customId === 'recovery_tos_deny') {
+    const denyEmbed = new EmbedBuilder()
+      .setTitle('TOS Not Accepted')
+      .setDescription('You must accept the TOS to proceed with account recovery.')
+      .setColor(0xFFA500);
+    await interaction.update({ embeds: [denyEmbed], components: [] });
   }
+}
 
   // --- MODAL HANDLER ---
   if (interaction.isModalSubmit()) {
