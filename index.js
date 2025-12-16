@@ -134,7 +134,7 @@ const modCommand = {
         // Handle Kick, Ban, Warn
         const targetMember = targetUser ? interaction.guild.members.cache.get(targetUser.id) : null;
         
-        if (!targetMember) {
+        if (subcommand !== 'ban' && !targetMember) {
             return interaction.reply({ content: `❌ Could not find **${targetUser.tag}** in this server.`, ephemeral: true });
         }
         
@@ -399,7 +399,7 @@ const avatarCommand = {
 client.commands.set(avatarCommand.data.name, avatarCommand);
 
 
-// --- 10. /say Command (NEW) ---
+// --- 10. /say Command ---
 const sayCommand = {
     data: new SlashCommandBuilder()
         .setName('say')
@@ -425,11 +425,67 @@ const sayCommand = {
         }
     }
 };
-client.commands.set(sayCommand.data.name, sayCommand); // <-- ADDED THE NEW COMMAND HERE
+client.commands.set(sayCommand.data.name, sayCommand); 
+
+
+// --- 11. /recover Command (NEW) ---
+const recoverCommand = {
+    data: new SlashCommandBuilder()
+        .setName('recover')
+        .setDescription('Reverses a moderation action (e.g., lifts timeout or unbans a user).')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers) 
+        .addSubcommand(subcommand =>
+            subcommand.setName('timeout').setDescription('Lifts the timeout/mute from a member.')
+                .addUserOption(option => option.setName('target').setDescription('The member to remove the timeout from.').setRequired(true))
+                .addStringOption(option => option.setName('reason').setDescription('The reason for lifting the timeout.').setRequired(false)))
+        .addSubcommand(subcommand =>
+            subcommand.setName('unban').setDescription('Unbans a user from the server.')
+                .addStringOption(option => option.setName('user_id').setDescription('The ID of the user to unban.').setRequired(true))
+                .addStringOption(option => option.setName('reason').setDescription('The reason for the unban.').setRequired(false))),
+
+    async execute(interaction) {
+        const subcommand = interaction.options.getSubcommand();
+        const reason = interaction.options.getString('reason') || 'No reason provided.';
+        const successEmbed = new EmbedBuilder().setColor(0x00FF00).setTimestamp().setFooter({ text: `Moderator: ${interaction.user.tag}` });
+        
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
+            if (subcommand === 'timeout') {
+                const targetUser = interaction.options.getUser('target');
+                const targetMember = interaction.guild.members.cache.get(targetUser.id);
+                
+                if (!targetMember) return interaction.editReply({ content: `❌ Could not find **${targetUser.tag}** in this server.`, ephemeral: true });
+                if (!targetMember.moderatable) return interaction.editReply({ content: `❌ I cannot moderate ${targetUser.tag}.`, ephemeral: true });
+
+                // Set timeout to 0 to remove it
+                await targetMember.timeout(null, reason); 
+                
+                successEmbed.setTitle('✅ Timeout Removed').setDescription(`**Target:** ${targetUser.tag}\n**Reason:** ${reason}`);
+                await interaction.editReply({ embeds: [successEmbed] });
+            
+            } else if (subcommand === 'unban') {
+                const userId = interaction.options.getString('user_id');
+
+                // Note: Unbanning requires the user ID, not a user object, since they are not in the guild.
+                await interaction.guild.bans.remove(userId, reason);
+
+                successEmbed.setTitle('✅ User Unbanned').setDescription(`**Target ID:** ${userId}\n**Reason:** ${reason}`);
+                await interaction.editReply({ embeds: [successEmbed] });
+            }
+
+        } catch (error) {
+            console.error(`Recover command failed: ${error}`);
+            const errorEmbed = new EmbedBuilder().setColor(0xFF0000).setDescription(`❌ Failed to execute action: \`${error.message}\``);
+            await interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
+        }
+    },
+};
+client.commands.set(recoverCommand.data.name, recoverCommand); // <--- ADDED THE NEW COMMAND HERE!
 
 
 // ==========================================================
-//              BOT EVENTS AND HANDLERS
+//              BOT EVENTS AND HANDLERS
 // ==========================================================
 
 // --- Command Registration and Ready Event ---
@@ -445,6 +501,7 @@ client.once('ready', async () => {
     const commandsToRegister = client.commands.map(command => command.data.toJSON());
     
     try {
+        // NOTE: This assumes you have a config.json file with a valid 'guildId'
         const { guildId } = require('./config.json'); 
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
         
@@ -458,7 +515,7 @@ client.once('ready', async () => {
 
         console.log(`Successfully reloaded ${commandsToRegister.length} application (/) commands.`);
     } catch (error) {
-        console.error("Command Registration Error:", error);
+        console.error("Command Registration Error: Make sure './config.json' with guildId exists, or use global registration.", error);
     }
 });
 
