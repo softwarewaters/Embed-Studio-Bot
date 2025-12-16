@@ -436,69 +436,88 @@ client.commands.set(accountRecoveryCommand.data.name, accountRecoveryCommand);
 // --- Interaction Handlers ---
 client.on('interactionCreate', async interaction => {
   try {
+    // --- Slash commands ---
+    if (interaction.isChatInputCommand()) {
+      const command = client.commands.get(interaction.commandName);
+      if (!command) return;
+      await command.execute(interaction);
+      return;
+    }
+
     // --- Buttons ---
     if (interaction.isButton()) {
-      switch (interaction.customId) {
-        case 'recovery_continue': {
-          const tosEmbed = new EmbedBuilder()
-            .setTitle('Agree To TOS')
-            .setDescription(
-              'To continue, you must agree to our guidelines / TOS. This is if your account may have been suspended due to guideline breaks.'
-            )
-            .setColor(0xFFFF00);
+      const { customId } = interaction;
 
-          const tosButtons = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('recovery_tos_agree').setLabel('Agree').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId('recovery_tos_deny').setLabel('Deny').setStyle(ButtonStyle.Danger)
-          );
+      // Recovery Buttons
+      if (customId === 'recovery_continue') {
+        const tosEmbed = new EmbedBuilder()
+          .setTitle('Agree To TOS')
+          .setDescription('To continue, you must agree to our guidelines / TOS. This is if your account may have been suspended due to guideline breaks.')
+          .setColor(0xFFFF00);
 
+        const tosButtons = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('recovery_tos_agree').setLabel('Agree').setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId('recovery_tos_deny').setLabel('Deny').setStyle(ButtonStyle.Danger)
+        );
+
+        // Use update safely
+        if (interaction.deferred || interaction.replied) {
+          await interaction.editReply({ embeds: [tosEmbed], components: [tosButtons] });
+        } else {
           await interaction.update({ embeds: [tosEmbed], components: [tosButtons] });
-          break;
         }
-        case 'recovery_cancel': {
-          const cancelEmbed = new EmbedBuilder()
-            .setTitle('Account Recovery Canceled')
-            .setDescription('The account recovery has been canceled.')
-            .setColor(0xFF0000);
+        return;
+      }
 
-          await interaction.update({ embeds: [cancelEmbed], components: [] });
-          break;
-        }
-        case 'recovery_tos_agree': {
-          const emailModal = new ModalBuilder().setCustomId('recovery_email_modal').setTitle('Enter Your Email');
+      if (customId === 'recovery_cancel') {
+        const cancelEmbed = new EmbedBuilder()
+          .setTitle('Account Recovery Canceled')
+          .setDescription('The account recovery has been canceled.')
+          .setColor(0xFF0000);
+        await interaction.update({ embeds: [cancelEmbed], components: [] });
+        return;
+      }
 
-          const emailInput = new TextInputBuilder()
-            .setCustomId('recovery_email_input')
-            .setLabel('Your Email Address')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setMaxLength(254);
+      if (customId === 'recovery_tos_agree') {
+        if (!interaction.isButton()) return; // ensure button
+        const emailModal = new ModalBuilder()
+          .setCustomId('recovery_email_modal')
+          .setTitle('Enter Your Email');
 
-          emailModal.addComponents(new ActionRowBuilder().addComponents(emailInput));
-          await interaction.showModal(emailModal);
-          break;
-        }
-        case 'recovery_tos_deny': {
-          const denyEmbed = new EmbedBuilder()
-            .setTitle('TOS Not Accepted')
-            .setDescription('You must accept the TOS to proceed with account recovery.')
-            .setColor(0xFFA500);
+        const emailInput = new TextInputBuilder()
+          .setCustomId('recovery_email_input')
+          .setLabel('Your Email Address')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(254);
 
-          await interaction.update({ embeds: [denyEmbed], components: [] });
-          break;
-        }
+        emailModal.addComponents(new ActionRowBuilder().addComponents(emailInput));
+
+        // Show modal immediately
+        await interaction.showModal(emailModal);
+        return;
+      }
+
+      if (customId === 'recovery_tos_deny') {
+        const denyEmbed = new EmbedBuilder()
+          .setTitle('TOS Not Accepted')
+          .setDescription('You must accept the TOS to proceed with account recovery.')
+          .setColor(0xFFA500);
+        await interaction.update({ embeds: [denyEmbed], components: [] });
+        return;
       }
     }
 
     // --- Modal submissions ---
     if (interaction.isModalSubmit()) {
-      // Handle Embed Studio Modal
-      if (interaction.customId === 'embedStudioModal') {
+      const { customId } = interaction;
+
+      if (customId === 'embedStudioModal') {
         await handleEmbedStudioModal(interaction);
+        return;
       }
 
-      // Account recovery modals
-      else if (interaction.customId === 'recovery_email_modal') {
+      if (customId === 'recovery_email_modal') {
         const email = interaction.fields.getTextInputValue('recovery_email_input');
         recoveryStates.set(interaction.user.id, { email });
 
@@ -515,8 +534,10 @@ client.on('interactionCreate', async interaction => {
 
         deviceModal.addComponents(new ActionRowBuilder().addComponents(deviceInput));
         await interaction.showModal(deviceModal);
+        return;
       }
-      else if (interaction.customId === 'recovery_device_modal') {
+
+      if (customId === 'recovery_device_modal') {
         const deviceInfo = interaction.fields.getTextInputValue('recovery_device_input');
         const state = recoveryStates.get(interaction.user.id);
         const email = state?.email ?? 'Unknown';
@@ -532,23 +553,14 @@ client.on('interactionCreate', async interaction => {
 
         await interaction.reply({ embeds: [finalEmbed], ephemeral: true });
         recoveryStates.delete(interaction.user.id);
+        return;
       }
-    }
-
-    // --- Slash commands ---
-    if (interaction.isChatInputCommand()) {
-      const command = client.commands.get(interaction.commandName);
-      if (!command) return;
-      await command.execute(interaction);
     }
   } catch (err) {
     console.error('Interaction handler error:', err);
-    if (interaction.isRepliable()) {
+    if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
       try {
-        await interaction.reply({
-          embeds: [new EmbedBuilder().setColor(0xFF0000).setDescription(`❌ Error: ${err.message}`)],
-          ephemeral: true,
-        });
+        await interaction.reply({ embeds: [new EmbedBuilder().setColor(0xFF0000).setDescription(`❌ Error: ${err.message}`)], ephemeral: true });
       } catch {}
     }
   }
