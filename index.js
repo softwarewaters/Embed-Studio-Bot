@@ -3,8 +3,9 @@ const {
     Client, GatewayIntentBits, Collection, REST, Routes, 
     SlashCommandBuilder, PermissionFlagsBits, ActivityType, 
     EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, 
-    ChannelType 
+    ChannelType, ButtonBuilder, ButtonStyle 
 } = require('discord.js');
+
 const dotenv = require('dotenv');
 const fs = require('fs');
 const express = require('express');
