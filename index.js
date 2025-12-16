@@ -575,33 +575,6 @@ client.once('ready', async () => {
 });
 
 
-// --- Interaction Listener and Modal Handler ---
-client.on('interactionCreate', async interaction => {
-    
-    // Handle Slash Commands
-    if (interaction.isChatInputCommand()) {
-        const command = client.commands.get(interaction.commandName);
-        if (!command) return;
-        try {
-            await command.execute(interaction);
-        } catch (error) {
-            console.error(error);
-            const errorEmbed = new EmbedBuilder().setColor(0xFF0000).setDescription(`❌ **Error executing command:** \`${error.message}\``);
-            if (interaction.deferred || interaction.replied) {
-                await interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
-            } else {
-                await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
-            }
-        }
-    }
-
-    // Handle Modal Submissions (Embed Studio)
-    if (interaction.isModalSubmit() && interaction.customId === 'embedStudioModal') {
-        await handleEmbedStudioModal(interaction);
-    }
-});
-
-
 // --- Embed Studio Modal Submission Handler Function ---
 async function handleEmbedStudioModal(interaction) {
     await interaction.deferReply({ ephemeral: true }); 
