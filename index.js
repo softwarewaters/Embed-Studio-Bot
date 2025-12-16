@@ -459,25 +459,39 @@ client.on('interactionCreate', async interaction => {
         .setDescription('The account recovery has been canceled.')
         .setColor(0xFF0000);
       await interaction.update({ embeds: [cancelEmbed], components: [] });
-    } else if (interaction.customId === 'recovery_tos_agree') {
-      const emailModal = new ModalBuilder()
-        .setCustomId('recovery_email_modal')
-        .setTitle('Enter Your Email');
-      const emailInput = new TextInputBuilder()
-        .setCustomId('recovery_email_input')
-        .setLabel('Your Email Address')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true)
-        .setMaxLength(254);
-      emailModal.addComponents(new ActionRowBuilder().addComponents(emailInput));
-      await interaction.showModal(emailModal);
-    } else if (interaction.customId === 'recovery_tos_deny') {
-      const denyEmbed = new EmbedBuilder()
-        .setTitle('TOS Not Accepted')
-        .setDescription('You must accept the TOS to proceed with account recovery.')
-        .setColor(0xFFA500);
-      await interaction.update({ embeds: [denyEmbed], components: [] });
-    }
+} else if (interaction.customId === 'recovery_tos_agree') {
+
+  // ✅ ACKNOWLEDGE THE BUTTON
+  await interaction.deferUpdate();
+
+  const emailModal = new ModalBuilder()
+    .setCustomId('recovery_email_modal')
+    .setTitle('Enter Your Email');
+
+  const emailInput = new TextInputBuilder()
+    .setCustomId('recovery_email_input')
+    .setLabel('Your Email Address')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMaxLength(254);
+
+  emailModal.addComponents(
+    new ActionRowBuilder().addComponents(emailInput)
+  );
+
+  // ✅ NOW SHOW THE MODAL
+  await interaction.showModal(emailModal);
+
+} else if (interaction.customId === 'recovery_tos_deny') {
+
+  const denyEmbed = new EmbedBuilder()
+    .setTitle('TOS Not Accepted')
+    .setDescription('You must accept the TOS to proceed with account recovery.')
+    .setColor(0xFFA500);
+
+  await interaction.update({ embeds: [denyEmbed], components: [] });
+}
+
   }
 
   if (interaction.isModalSubmit()) {
