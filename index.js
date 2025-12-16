@@ -33,7 +33,7 @@ client.commands = new Collection();
 
 
 // ==========================================================
-//              COMMAND DATA DEFINITIONS
+//                   COMMAND DATA DEFINITIONS
 // ==========================================================
 
 // --- 1. /embed Command (Studio) ---
@@ -134,7 +134,7 @@ const modCommand = {
         // Handle Kick, Ban, Warn
         const targetMember = targetUser ? interaction.guild.members.cache.get(targetUser.id) : null;
         
-        if (subcommand !== 'ban' && !targetMember) {
+        if (!targetMember) {
             return interaction.reply({ content: `❌ Could not find **${targetUser.tag}** in this server.`, ephemeral: true });
         }
         
@@ -399,93 +399,153 @@ const avatarCommand = {
 client.commands.set(avatarCommand.data.name, avatarCommand);
 
 
-// --- 10. /say Command ---
-const sayCommand = {
-    data: new SlashCommandBuilder()
-        .setName('say')
-        .setDescription('Makes the bot send a message in the current channel.')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator) // Restrict to Administrators
-        .addStringOption(option => 
-            option.setName('message').setDescription('The message the bot should send.').setRequired(true)),
-    
+// ===================== YOUR NEW /accountrecovery COMMAND =====================
+const { SlashCommandBuilder: SlashBuilder } = require('discord.js');
+
+const recoveryStates = new Map(); // To store temporary recovery info per user
+
+const accountRecoveryCommand = {
+    data: new SlashBuilder()
+        .setName('accountrecovery')
+        .setDescription('Start the account recovery process.')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     async execute(interaction) {
-        const messageToSend = interaction.options.getString('message');
-
-        try {
-            // Delete the user's command interaction reply, then send the message
-            await interaction.deferReply({ ephemeral: true }); // Defer to prevent timeout
-            
-            await interaction.channel.send(messageToSend);
-            
-            // Send a confirmation reply that is only visible to the user
-            await interaction.editReply({ content: '✅ Message sent!', ephemeral: true });
-        } catch (error) {
-            console.error('Say command failed:', error);
-            await interaction.editReply({ content: `❌ Failed to send message: ${error.message}`, ephemeral: true });
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+            return interaction.reply({ content: 'You do not have permission to run this command.', ephemeral: true });
         }
-    }
-};
-client.commands.set(sayCommand.data.name, sayCommand); 
-
-
-// --- 11. /recover Command (NEW) ---
-const recoverCommand = {
-    data: new SlashCommandBuilder()
-        .setName('recover')
-        .setDescription('Reverses a moderation action (e.g., lifts timeout or unbans a user).')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers) 
-        .addSubcommand(subcommand =>
-            subcommand.setName('timeout').setDescription('Lifts the timeout/mute from a member.')
-                .addUserOption(option => option.setName('target').setDescription('The member to remove the timeout from.').setRequired(true))
-                .addStringOption(option => option.setName('reason').setDescription('The reason for lifting the timeout.').setRequired(false)))
-        .addSubcommand(subcommand =>
-            subcommand.setName('unban').setDescription('Unbans a user from the server.')
-                .addStringOption(option => option.setName('user_id').setDescription('The ID of the user to unban.').setRequired(true))
-                .addStringOption(option => option.setName('reason').setDescription('The reason for the unban.').setRequired(false))),
-
-    async execute(interaction) {
-        const subcommand = interaction.options.getSubcommand();
-        const reason = interaction.options.getString('reason') || 'No reason provided.';
-        const successEmbed = new EmbedBuilder().setColor(0x00FF00).setTimestamp().setFooter({ text: `Moderator: ${interaction.user.tag}` });
-        
-        await interaction.deferReply({ ephemeral: true });
-
-        try {
-            if (subcommand === 'timeout') {
-                const targetUser = interaction.options.getUser('target');
-                const targetMember = interaction.guild.members.cache.get(targetUser.id);
-                
-                if (!targetMember) return interaction.editReply({ content: `❌ Could not find **${targetUser.tag}** in this server.`, ephemeral: true });
-                if (!targetMember.moderatable) return interaction.editReply({ content: `❌ I cannot moderate ${targetUser.tag}.`, ephemeral: true });
-
-                // Set timeout to 0 to remove it
-                await targetMember.timeout(null, reason); 
-                
-                successEmbed.setTitle('✅ Timeout Removed').setDescription(`**Target:** ${targetUser.tag}\n**Reason:** ${reason}`);
-                await interaction.editReply({ embeds: [successEmbed] });
-            
-            } else if (subcommand === 'unban') {
-                const userId = interaction.options.getString('user_id');
-
-                // Note: Unbanning requires the user ID, not a user object, since they are not in the guild.
-                await interaction.guild.bans.remove(userId, reason);
-
-                successEmbed.setTitle('✅ User Unbanned').setDescription(`**Target ID:** ${userId}\n**Reason:** ${reason}`);
-                await interaction.editReply({ embeds: [successEmbed] });
-            }
-
-        } catch (error) {
-            console.error(`Recover command failed: ${error}`);
-            const errorEmbed = new EmbedBuilder().setColor(0xFF0000).setDescription(`❌ Failed to execute action: \`${error.message}\``);
-            await interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
-        }
+        const initialEmbed = new EmbedBuilder()
+            .setTitle('Welcome To Account Recovery Portal')
+            .setDescription('We Will Provide You With Help And Steps To Recover Your Embed Studio Account.')
+            .setColor(0x00AAFF);
+        const row1 = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('recovery_continue')
+                    .setLabel('Continue')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('recovery_cancel')
+                    .setLabel('Cancel')
+                    .setStyle(ButtonStyle.Danger)
+            );
+        await interaction.reply({ embeds: [initialEmbed], components: [row1], ephemeral: false });
     },
 };
-client.commands.set(recoverCommand.data.name, recoverCommand); // <--- ADDED THE NEW COMMAND HERE!
 
+// Register command
+client.commands.set(accountRecoveryCommand.data.name, accountRecoveryCommand);
+
+// --- INTERACTION HANDLERS ---
+client.on('interactionCreate', async interaction => {
+    if (interaction.isButton()) {
+        // Recovery flow
+        if (interaction.customId === 'recovery_continue') {
+            const tosEmbed = new EmbedBuilder()
+                .setTitle('Agree To TOS')
+                .setDescription('To continue, you must agree to our guidelines / TOS. This is if your account may have been suspended due to guideline breaks.')
+                .setColor(0xFFFF00);
+            const tosButtons = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('recovery_tos_agree')
+                        .setLabel('Agree')
+                        .setStyle(ButtonStyle.Success),
+                    new ButtonBuilder()
+                        .setCustomId('recovery_tos_deny')
+                        .setLabel('Deny')
+                        .setStyle(ButtonStyle.Danger)
+                );
+            await interaction.update({ embeds: [tosEmbed], components: [tosButtons] });
+        } else if (interaction.customId === 'recovery_cancel') {
+            const cancelEmbed = new EmbedBuilder()
+                .setTitle('Account Recovery Canceled')
+                .setDescription('The account recovery process has been canceled.')
+                .setColor(0xFF0000);
+            await interaction.update({ embeds: [cancelEmbed], components: [] });
+        } else if (interaction.customId === 'recovery_tos_agree') {
+            const emailModal = new ModalBuilder()
+                .setCustomId('recovery_email_modal')
+                .setTitle('Enter Your Email');
+            const emailInput = new TextInputBuilder()
+                .setCustomId('recovery_email_input')
+                .setLabel('Your Email Address')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setMaxLength(254);
+            emailModal.addComponents(new ActionRowBuilder().addComponents(emailInput));
+            await interaction.showModal(emailModal);
+        } else if (interaction.customId === 'recovery_tos_deny') {
+            const denyEmbed = new EmbedBuilder()
+                .setTitle('TOS Not Accepted')
+                .setDescription('You must accept the TOS to proceed with account recovery.')
+                .setColor(0xFFA500);
+            await interaction.update({ embeds: [denyEmbed], components: [] });
+        } else if (interaction.customId === 'recovery_email_modal') {
+            const email = interaction.fields.getTextInputValue('recovery_email_input');
+            // Save email temporarily
+            recoveryStates.set(interaction.user.id, { email });
+            // Ask for device info
+            const deviceEmbed = new EmbedBuilder()
+                .setTitle('Device Information')
+                .setDescription('Now, please tell us what device you are trying to access your account on.\nExample: Windows 11 Chrome')
+                .setColor(0x00FF00);
+            const deviceModal = new ModalBuilder()
+                .setCustomId('recovery_device_modal')
+                .setTitle('Enter Device Info');
+            const deviceInput = new TextInputBuilder()
+                .setCustomId('recovery_device_input')
+                .setLabel('Device Info')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+                .setMaxLength(100);
+            deviceModal.addComponents(new ActionRowBuilder().addComponents(deviceInput));
+            await interaction.showModal(deviceModal);
+        }
+    } else if (interaction.isModalSubmit()) {
+        if (interaction.customId === 'recovery_device_modal') {
+            const deviceInfo = interaction.fields.getTextInputValue('recovery_device_input');
+            const userId = interaction.user.id;
+            const state = recoveryStates.get(userId);
+            const email = state ? state.email : 'Unknown';
+            const finalEmbed = new EmbedBuilder()
+                .setTitle('Recovery Request Submitted')
+                .addFields(
+                    { name: 'Email', value: email, inline: false },
+                    { name: 'Device', value: deviceInfo, inline: false }
+                )
+                .setDescription('Please wait for one of our tech supports to get back to you!')
+                .setColor(0x00FF00);
+            await interaction.reply({ embeds: [finalEmbed], ephemeral: false });
+            recoveryStates.delete(userId);
+        }
+    }
+
+
+    // Handle slash commands
+    if (interaction.isChatInputCommand()) {
+        const command = client.commands.get(interaction.commandName);
+        if (!command) return;
+        try {
+            await command.execute(interaction);
+        } catch (err) {
+            console.error(err);
+            const errorEmbed = new EmbedBuilder().setColor(0xFF0000).setDescription(`❌ **Error:** \`${err.message}\``);
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
+            } else {
+                await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+            }
+        }
+    }
+
+    // Embed Studio modal
+    if (interaction.isModalSubmit() && interaction.customId === 'embedStudioModal') {
+        await handleEmbedStudioModal(interaction);
+    }
+});
 
 // ==========================================================
-//              BOT EVENTS AND HANDLERS
+//                 BOT EVENTS AND HANDLERS
 // ==========================================================
 
 // --- Command Registration and Ready Event ---
@@ -501,13 +561,11 @@ client.once('ready', async () => {
     const commandsToRegister = client.commands.map(command => command.data.toJSON());
     
     try {
-        // NOTE: This assumes you have a config.json file with a valid 'guildId'
         const { guildId } = require('./config.json'); 
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
         
         console.log('Started refreshing application (/) commands.');
 
-        // This is the critical line that registers all commands with Discord
         await rest.put(
             Routes.applicationGuildCommands(client.user.id, guildId),
             { body: commandsToRegister },
@@ -515,7 +573,7 @@ client.once('ready', async () => {
 
         console.log(`Successfully reloaded ${commandsToRegister.length} application (/) commands.`);
     } catch (error) {
-        console.error("Command Registration Error: Make sure './config.json' with guildId exists, or use global registration.", error);
+        console.error("Command Registration Error:", error);
     }
 });
 
