@@ -400,7 +400,6 @@ client.commands.set(avatarCommand.data.name, avatarCommand);
 
 
 // ===================== YOUR NEW /accountrecovery COMMAND =====================
-const { SlashCommandBuilder } = require('discord.js');
 
 const recoveryStates = new Map();
 
