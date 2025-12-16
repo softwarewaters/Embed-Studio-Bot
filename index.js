@@ -400,12 +400,12 @@ client.commands.set(avatarCommand.data.name, avatarCommand);
 
 
 // ===================== YOUR NEW /accountrecovery COMMAND =====================
-const { SlashCommandBuilder: SlashBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 
-const recoveryStates = new Map(); // To store temporary recovery info per user
+const recoveryStates = new Map();
 
 const accountRecoveryCommand = {
-    data: new SlashBuilder()
+    data: new SlashCommandBuilder()
         .setName('accountrecovery')
         .setDescription('Start the account recovery process.')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -413,11 +413,11 @@ const accountRecoveryCommand = {
         if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
             return interaction.reply({ content: 'You do not have permission to run this command.', ephemeral: true });
         }
-        const initialEmbed = new EmbedBuilder()
+        const embed = new EmbedBuilder()
             .setTitle('Welcome To Account Recovery Portal')
             .setDescription('We Will Provide You With Help And Steps To Recover Your Embed Studio Account.')
             .setColor(0x00AAFF);
-        const row1 = new ActionRowBuilder()
+        const row = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
                     .setCustomId('recovery_continue')
@@ -428,17 +428,15 @@ const accountRecoveryCommand = {
                     .setLabel('Cancel')
                     .setStyle(ButtonStyle.Danger)
             );
-        await interaction.reply({ embeds: [initialEmbed], components: [row1], ephemeral: false });
+        await interaction.reply({ embeds: [embed], components: [row], ephemeral: false });
     },
 };
 
-// Register command
 client.commands.set(accountRecoveryCommand.data.name, accountRecoveryCommand);
 
-// --- INTERACTION HANDLERS ---
+// --- Interaction Handlers ---
 client.on('interactionCreate', async interaction => {
     if (interaction.isButton()) {
-        // Recovery flow
         if (interaction.customId === 'recovery_continue') {
             const tosEmbed = new EmbedBuilder()
                 .setTitle('Agree To TOS')
@@ -482,9 +480,7 @@ client.on('interactionCreate', async interaction => {
             await interaction.update({ embeds: [denyEmbed], components: [] });
         } else if (interaction.customId === 'recovery_email_modal') {
             const email = interaction.fields.getTextInputValue('recovery_email_input');
-            // Save email temporarily
             recoveryStates.set(interaction.user.id, { email });
-            // Ask for device info
             const deviceEmbed = new EmbedBuilder()
                 .setTitle('Device Information')
                 .setDescription('Now, please tell us what device you are trying to access your account on.\nExample: Windows 11 Chrome')
@@ -519,7 +515,6 @@ client.on('interactionCreate', async interaction => {
             recoveryStates.delete(userId);
         }
     }
-
 
     // Handle slash commands
     if (interaction.isChatInputCommand()) {
